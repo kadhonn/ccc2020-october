@@ -1,41 +1,11 @@
-do $$
+create or replace function splitinput()
+returns int as $$
+declare
+    tosplit text;
 begin
-   for counter in 1..5 loop
-	raise notice 'counter: %', counter;
-   end loop;
-end; $$
+    tosplit = pg_read_file('in/lvl1/level1_1.in');
+    raise notice '%', tosplit;
+    return 0;
+end; $$ LANGUAGE plpgsql;
 
-
-CREATE OR REPLACE FUNCTION somefunc(integer, text) RETURNS integer
-AS '
-    for counter in 1..5
-        loop
-            raise notice ''counter: %'', counter;
-        end loop;
-'
-LANGUAGE plpgsql;
-
-
-
-CREATE FUNCTION somefunc() RETURNS integer AS $$
-<< outerblock >>
-DECLARE
-    quantity integer := 30;
-BEGIN
-    RAISE NOTICE 'Quantity here is %', quantity;  -- Prints 30
-    quantity := 50;
-    --
-    -- Create a subblock
-    --
-    DECLARE
-        quantity integer := 80;
-    BEGIN
-        RAISE NOTICE 'Quantity here is %', quantity;  -- Prints 80
-        RAISE NOTICE 'Outer quantity here is %', outerblock.quantity;  -- Prints 50
-    END;
-
-    RAISE NOTICE 'Quantity here is %', quantity;  -- Prints 50
-
-    RETURN quantity;
-END;
-$$ LANGUAGE plpgsql;
+select splitinput();
