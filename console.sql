@@ -1,14 +1,15 @@
 truncate table prices;
 truncate table tasks;
-truncate table task_costs;
+truncate table task_power;
 truncate table output;
+truncate table i;
 
 create or replace function readInput()
 returns text as $$
 declare
     tosplit text;
 begin
-    tosplit = pg_read_file('in/lvl3/level3_5.in');
+    tosplit = pg_read_file('in/lvl4/level4_1.in');
 --     raise notice '%', tosplit;
     return tosplit;
 end; $$ LANGUAGE plpgsql;
@@ -17,7 +18,7 @@ end; $$ LANGUAGE plpgsql;
 create or replace function parseInput()
 returns text as $$
 declare
-    i int := 1;
+    i int := 3;
     price int;
     tosplit text;
     task text;
@@ -29,21 +30,22 @@ declare
     m int;
 begin
     tosplit := readInput();
+    insert into i values (SPLIT_PART(tosplit, E'\n', 1)::int);
     n := SPLIT_PART(tosplit, E'\n', i)::int;
     raise notice 'before prices';
     loop
         i := i+1;
-        if (n+2 = i ) then
+        if (n+4 = i ) then
             exit;
         end if;
         price := SPLIT_PART(tosplit, E'\n', i)::int;
-        insert into prices values (price, i-2);
+        insert into prices values (price, i-4);
     end loop;
     m := SPLIT_PART(tosplit, E'\n', i)::int;
     raise notice 'before tasks %',m;
     loop
         i := i+1;
-        if (m+n+3 = i ) then
+        if (m+n+5 = i ) then
             exit;
         end if;
         task := SPLIT_PART(tosplit, E'\n', i);
@@ -62,15 +64,50 @@ create or replace function findMin()
 returns text as $$
 declare
     out text;
+    price prices%ROWTYPE;
     task tasks%ROWTYPE;
-    minid int;
+    remainingpower int;
+    wanttouse int;
+    consumed int;
+    task_powervar task_power%ROWTYPE;
 begin
-    out = '' || ((select count(*) from tasks)::text) || E'\n';
-    for task in (select * from tasks) loop
-        select min(id) from prices where id >= task.taskstart and id <=task.taskend and price = any(select min(price) from prices where id >= task.taskstart and id <=task.taskend) into minid;
-        raise notice '%', task;
-        out = out || task.taskid || ' ' || minid || ' ' || task.taskpower || E'\n';
+    for price in (select * from prices order by price asc) loop
+        select powermax from i into remainingpower;
+
+
+        for task in select * from tasks where tasks.taskstart <= price.id and tasks.taskend >= price.id loop
+
+
+            select coalesce(sum(powerconsumed),0) from task_power where taskid = task.taskid group by taskid into consumed;
+            if (remainingpower > consumed) then
+                wanttouse = remainingpower;
+            else
+                wanttouse = consumed;
+            end if;
+            remainingpower = remainingpower - wanttouse;
+            raise notice 'consumed: %', consumed;
+            raise notice 'remainingpower: %', remainingpower;
+            raise notice 'wanttouse: %', wanttouse;
+            insert into task_power values (task.taskid, price.id, wanttouse);
+            if (remainingpower = 0) then
+                exit;
+            end if;
+        end loop;
     end loop;
+            raise notice 'FUUU';
+    out = '' || ((select count(*) from tasks)::text) || E'\n';
+            raise notice 'WAT1 %', out;
+    for task in select * from tasks loop
+        out = out || task.taskid::text;
+            raise notice 'WAT2 %', out;
+        for task_powervar in select * from task_power where taskid = task.taskid loop
+            out = out || ' ' || task_powervar.priceid::text || ' ' || task_powervar.powerconsumed::text;
+            raise notice 'WAT3 %', out;
+        end loop;
+        out = out || E'\n';
+            raise notice 'WAT4 %', out;
+    end loop;
+            raise notice 'WAT5 %', out;
     insert into output values (out);
     return out;
 end; $$ LANGUAGE plpgsql;
