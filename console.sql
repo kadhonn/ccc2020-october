@@ -8,7 +8,7 @@ returns text as $$
 declare
     tosplit text;
 begin
-    tosplit = pg_read_file('in/lvl2/level2_5.in');
+    tosplit = pg_read_file('in/lvl3/level3_5.in');
 --     raise notice '%', tosplit;
     return tosplit;
 end; $$ LANGUAGE plpgsql;
@@ -22,7 +22,9 @@ declare
     tosplit text;
     task text;
     taskid int;
-    taskduration int;
+    taskpower int;
+    taskstart int;
+    taskend int;
     n int;
     m int;
 begin
@@ -46,51 +48,33 @@ begin
         end if;
         task := SPLIT_PART(tosplit, E'\n', i);
         taskid := SPLIT_PART(task, ' ', 1)::int;
-        taskduration := SPLIT_PART(task, ' ', 2)::int;
-        insert into tasks values (taskid, taskduration);
+        taskpower := SPLIT_PART(task, ' ', 2)::int;
+        taskstart := SPLIT_PART(task, ' ', 3)::int;
+        taskend := SPLIT_PART(task, ' ', 4)::int;
+        insert into tasks values (taskid, taskpower, taskstart, taskend);
     end loop;
     return tosplit;
 end; $$ LANGUAGE plpgsql;
 
 select parseInput();
 
-
-create or replace function calcCosts()
-returns text as $$
-declare
-    task tasks%ROWTYPE;
-    i int;
-begin
-    for task in select * from tasks loop
-        i := 0;
-        loop
-            if ( i + task.taskduration > (select count(*) from prices) ) then
-                exit;
-            end if;
-            insert into task_costs values( task.taskid,(select sum(price) from prices where id >= i and id <i+task.taskduration),i);
-            i := i+1;
-        end loop;
-    end loop;
-    return 0;
-end; $$ LANGUAGE plpgsql;
-
 create or replace function findMin()
 returns text as $$
 declare
     out text;
-    mintask task_costs%ROWTYPE;
+    task tasks%ROWTYPE;
+    minid int;
 begin
     out = '' || ((select count(*) from tasks)::text) || E'\n';
-    for mintask in (select taskid, price, beginwtf from task_costs where taskid::text||price::text in (select taskid::text||min(price)::text from task_costs group by taskid)) loop
-
-        raise notice '%', mintask;
-        out = out || mintask.taskid || ' ' || mintask.beginwtf || E'\n';
+    for task in (select * from tasks) loop
+        select min(id) from prices where id >= task.taskstart and id <=task.taskend and price = any(select min(price) from prices where id >= task.taskstart and id <=task.taskend) into minid;
+        raise notice '%', task;
+        out = out || task.taskid || ' ' || minid || ' ' || task.taskpower || E'\n';
     end loop;
     insert into output values (out);
     return out;
 end; $$ LANGUAGE plpgsql;
 
-select calcCosts();
 select findMin();
 
 COPY (SELECT * from output) TO '/in/some_file_name' CSV QUOTE ' ';
